@@ -5,8 +5,9 @@ metadata:
 data:
   redis.conf: |
     # Engedélyezzük az AOF módot
-    appendonly yes
-    # Minden írás után azonnal lemezre ír (biztonságos, de nagyobb I/O terhelés)
-    appendfsync always
+    appendonly no
+    save 900 1
+    save 300 10
+    save 60 10000
     # Adattároló könyvtár
     dir /data
