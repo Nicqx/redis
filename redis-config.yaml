@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+data:
+  redis.conf: |
+    # Engedélyezzük az AOF módot
+    appendonly yes
+    # Minden írás után azonnal lemezre ír (biztonságos, de nagyobb I/O terhelés)
+    appendfsync always
+    # Adattároló könyvtár
+    dir /data
