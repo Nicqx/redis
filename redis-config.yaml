@@ -4,10 +4,9 @@ metadata:
   name: redis-config
 data:
   redis.conf: |
-    # Engedélyezzük az AOF módot
+    # RDB snapshot mód engedélyezése
     appendonly no
-    save 900 1
-    save 300 10
-    save 60 10000
-    # Adattároló könyvtár
+    # Ha legalább 1 változás történik 1 másodperc alatt, készít snapshotot
+    save 1 1
+    # Beállítja az adattároló könyvtárat
     dir /data

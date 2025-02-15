@@ -8,7 +8,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: ""   # Üres string, hogy ne várjon dinamikus provisionerre
+  storageClassName: ""
   selector:
     matchLabels:
       type: manual
