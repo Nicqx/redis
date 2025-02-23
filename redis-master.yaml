@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-master
+spec:
+  serviceName: redis-master
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+      role: master
+  template:
+    metadata:
+      labels:
+        app: redis
+        role: master
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: "kubernetes.io/hostname"
+                operator: In
+                values:
+                - pi5   # Master fut a pi5-n
+      containers:
+      - name: redis
+        image: redis:6.2
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+        - name: redis-master-storage
+          mountPath: /data
+        - name: redis-config
+          mountPath: /etc/redis
+          readOnly: true
+        command: ["redis-server", "/etc/redis/redis.conf"]
+        env:
+          - name: REDIS_ROLE
+            value: "master"
+      volumes:
+      - name: redis-master-storage
+        persistentVolumeClaim:
+          claimName: redis-master-pvc
+      - name: redis-config
+        configMap:
+          name: redis-config

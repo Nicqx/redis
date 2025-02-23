@@ -4,9 +4,9 @@ metadata:
   name: redis-config
 data:
   redis.conf: |
-    # RDB snapshot mód engedélyezése
-    appendonly no
-    # Ha legalább 1 változás történik 1 másodperc alatt, készít snapshotot
-    save 1 1
-    # Beállítja az adattároló könyvtárat
-    dir /data
+    bind 0.0.0.0
+    protected-mode yes
+    port 6379
+    dir /home/user/redis/data
+    appendonly yes
+    appendfsync everysec
