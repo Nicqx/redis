@@ -7,6 +7,6 @@ data:
     bind 0.0.0.0
     protected-mode yes
     port 6379
-    dir /home/user/redis/data
+    dir /data
     appendonly yes
     appendfsync everysec
