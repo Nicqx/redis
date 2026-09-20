@@ -1,0 +1,400 @@
+[
+  {
+    "apiVersion": "v1",
+    "kind": "ConfigMap",
+    "metadata": {
+      "name": "redis-config"
+    },
+    "data": {
+      "redis.conf": "bind 0.0.0.0\nprotected-mode no\nport 6379\n\ndir /data\n\nappendonly yes\nappendfsync everysec\n\nsave 900 1\nsave 300 10\nsave 60 10000\n\ntcp-keepalive 60\ntimeout 0\n\nmaxmemory-policy noeviction\n"
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+      "name": "redis-master",
+      "labels": {
+        "app": "redis",
+        "role": "master"
+      }
+    },
+    "spec": {
+      "clusterIP": "None",
+      "selector": {
+        "app": "redis",
+        "role": "master"
+      },
+      "ports": [
+        {
+          "name": "redis",
+          "port": 6379,
+          "targetPort": "redis"
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+      "name": "redis-service",
+      "labels": {
+        "app": "redis",
+        "role": "master"
+      }
+    },
+    "spec": {
+      "type": "ClusterIP",
+      "selector": {
+        "app": "redis",
+        "role": "master"
+      },
+      "ports": [
+        {
+          "name": "redis",
+          "protocol": "TCP",
+          "port": 6379,
+          "targetPort": "redis"
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+      "name": "redis-replica-service",
+      "labels": {
+        "app": "redis",
+        "role": "replica"
+      }
+    },
+    "spec": {
+      "type": "ClusterIP",
+      "selector": {
+        "app": "redis",
+        "role": "replica"
+      },
+      "ports": [
+        {
+          "name": "redis",
+          "protocol": "TCP",
+          "port": 6379,
+          "targetPort": "redis"
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "apps/v1",
+    "kind": "StatefulSet",
+    "metadata": {
+      "name": "redis-master"
+    },
+    "spec": {
+      "serviceName": "redis-master",
+      "replicas": 1,
+      "selector": {
+        "matchLabels": {
+          "app": "redis",
+          "role": "master"
+        }
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app": "redis",
+            "role": "master"
+          }
+        },
+        "spec": {
+          "enableServiceLinks": false,
+          "terminationGracePeriodSeconds": 30,
+          "containers": [
+            {
+              "name": "redis",
+              "image": "redis:7.4.11-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7",
+              "imagePullPolicy": "IfNotPresent",
+              "command": [
+                "redis-server",
+                "/etc/redis/redis.conf"
+              ],
+              "ports": [
+                {
+                  "name": "redis",
+                  "containerPort": 6379
+                }
+              ],
+              "volumeMounts": [
+                {
+                  "name": "redis-data",
+                  "mountPath": "/data"
+                },
+                {
+                  "name": "redis-config",
+                  "mountPath": "/etc/redis",
+                  "readOnly": true
+                },
+                {
+                  "name": "redis-tmp",
+                  "mountPath": "/tmp"
+                }
+              ],
+              "readinessProbe": {
+                "exec": {
+                  "command": [
+                    "redis-cli",
+                    "ping"
+                  ]
+                },
+                "initialDelaySeconds": 5,
+                "periodSeconds": 5,
+                "timeoutSeconds": 2,
+                "failureThreshold": 3
+              },
+              "livenessProbe": {
+                "exec": {
+                  "command": [
+                    "redis-cli",
+                    "ping"
+                  ]
+                },
+                "initialDelaySeconds": 15,
+                "periodSeconds": 10,
+                "timeoutSeconds": 2,
+                "failureThreshold": 3
+              },
+              "resources": {
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "128Mi"
+                },
+                "limits": {
+                  "cpu": "500m",
+                  "memory": "512Mi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "readOnlyRootFilesystem": true,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                }
+              }
+            }
+          ],
+          "volumes": [
+            {
+              "name": "redis-config",
+              "configMap": {
+                "name": "redis-config"
+              }
+            },
+            {
+              "name": "redis-tmp",
+              "emptyDir": {
+                "sizeLimit": "2Gi"
+              }
+            }
+          ],
+          "automountServiceAccountToken": false,
+          "securityContext": {
+            "seccompProfile": {
+              "type": "RuntimeDefault"
+            },
+            "runAsNonRoot": true,
+            "runAsUser": 999,
+            "runAsGroup": 1000,
+            "fsGroup": 1000
+          }
+        }
+      },
+      "volumeClaimTemplates": [
+        {
+          "metadata": {
+            "name": "redis-data"
+          },
+          "spec": {
+            "accessModes": [
+              "ReadWriteOnce"
+            ],
+            "storageClassName": "local-path",
+            "resources": {
+              "requests": {
+                "storage": "2Gi"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+      "name": "redis-replica"
+    },
+    "spec": {
+      "replicas": 1,
+      "strategy": {
+        "type": "Recreate"
+      },
+      "selector": {
+        "matchLabels": {
+          "app": "redis",
+          "role": "replica"
+        }
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app": "redis",
+            "role": "replica"
+          }
+        },
+        "spec": {
+          "enableServiceLinks": false,
+          "terminationGracePeriodSeconds": 30,
+          "affinity": {
+            "podAntiAffinity": {
+              "preferredDuringSchedulingIgnoredDuringExecution": [
+                {
+                  "weight": 100,
+                  "podAffinityTerm": {
+                    "labelSelector": {
+                      "matchLabels": {
+                        "app": "redis",
+                        "role": "master"
+                      }
+                    },
+                    "topologyKey": "kubernetes.io/hostname"
+                  }
+                }
+              ]
+            }
+          },
+          "containers": [
+            {
+              "name": "redis",
+              "image": "redis:7.4.11-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7",
+              "imagePullPolicy": "IfNotPresent",
+              "command": [
+                "/bin/sh",
+                "-c"
+              ],
+              "args": [
+                "MASTER_HOST=\"redis-master-0.redis-master.${POD_NAMESPACE}.svc.cluster.local\"\necho \"Starting Redis replica. Master: ${MASTER_HOST}:6379\"\nexec redis-server /etc/redis/redis.conf --replicaof \"${MASTER_HOST}\" 6379\n"
+              ],
+              "env": [
+                {
+                  "name": "POD_NAMESPACE",
+                  "valueFrom": {
+                    "fieldRef": {
+                      "fieldPath": "metadata.namespace"
+                    }
+                  }
+                }
+              ],
+              "ports": [
+                {
+                  "name": "redis",
+                  "containerPort": 6379
+                }
+              ],
+              "volumeMounts": [
+                {
+                  "name": "redis-replica-data",
+                  "mountPath": "/data"
+                },
+                {
+                  "name": "redis-config",
+                  "mountPath": "/etc/redis",
+                  "readOnly": true
+                },
+                {
+                  "name": "redis-tmp",
+                  "mountPath": "/tmp"
+                }
+              ],
+              "readinessProbe": {
+                "exec": {
+                  "command": [
+                    "redis-cli",
+                    "ping"
+                  ]
+                },
+                "initialDelaySeconds": 8,
+                "periodSeconds": 5,
+                "timeoutSeconds": 2,
+                "failureThreshold": 5
+              },
+              "livenessProbe": {
+                "exec": {
+                  "command": [
+                    "redis-cli",
+                    "ping"
+                  ]
+                },
+                "initialDelaySeconds": 20,
+                "periodSeconds": 10,
+                "timeoutSeconds": 2,
+                "failureThreshold": 3
+              },
+              "resources": {
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "128Mi"
+                },
+                "limits": {
+                  "cpu": "500m",
+                  "memory": "512Mi"
+                }
+              },
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "readOnlyRootFilesystem": true,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                }
+              }
+            }
+          ],
+          "volumes": [
+            {
+              "name": "redis-replica-data",
+              "emptyDir": {}
+            },
+            {
+              "name": "redis-config",
+              "configMap": {
+                "name": "redis-config"
+              }
+            },
+            {
+              "name": "redis-tmp",
+              "emptyDir": {
+                "sizeLimit": "2Gi"
+              }
+            }
+          ],
+          "automountServiceAccountToken": false,
+          "securityContext": {
+            "seccompProfile": {
+              "type": "RuntimeDefault"
+            },
+            "runAsNonRoot": true,
+            "runAsUser": 999,
+            "runAsGroup": 1000,
+            "fsGroup": 1000
+          }
+        }
+      }
+    }
+  }
+]

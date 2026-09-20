@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+config.local.json
+secrets/
+backups/
+*.rdb
+*.aof
+*-export.json
