@@ -1,0 +1,16 @@
+name: Infrastructure checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: sudo apt-get update && sudo apt-get install -y redis-server redis-tools
+      - run: REQUIRE_REDIS_TESTS=1 python3 -m unittest discover -s tests -v
+      - run: python3 -m compileall -q scripts
+      - run: for file in update.sh scripts/*.sh; do bash -n "$file"; done
