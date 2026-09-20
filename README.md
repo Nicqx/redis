@@ -95,3 +95,24 @@ Részletes sorrend: [Pi5 → NUC útmutató](https://github.com/Nicqx/ingress/bl
 ## Ellenőrzés
 
 `python3 -m unittest discover -s tests -v` futtatja a teszteket. A valódi Redis-tesztekhez `redis-server` és `redis-cli` kell; más elérési úthoz `REDIS_SERVER` / `REDIS_CLI` adható meg. `REQUIRE_REDIS_TESTS=1` esetén hiányzó binárissal a teszt hibázik. A CI ezt kötelezővé teszi. A teszt Redis külön, ideiglenes könyvtárban, csak loopback címen indul.
+
+## Leállítás és eltávolítás
+
+Adatművelet előtt mindig készíts és ellenőrizz RDB-mentést a `scripts/manage.py backup` paranccsal.
+
+```bash
+# biztonságos ideiglenes leállítás; a PVC megmarad
+sudo k3s kubectl scale deployment/redis-replica -n default --replicas=0
+sudo k3s kubectl scale statefulset/redis-master -n default --replicas=0
+
+# visszaindítás
+sudo k3s kubectl scale statefulset/redis-master -n default --replicas=1
+sudo k3s kubectl scale deployment/redis-replica -n default --replicas=1
+
+# workloadok és service-ek eltávolítása, a PVC megtartásával
+sudo k3s kubectl delete deployment/redis-replica statefulset/redis-master -n default
+sudo k3s kubectl delete service/redis-master service/redis-service service/redis-replica-service -n default
+sudo k3s kubectl delete configmap/redis-config -n default
+```
+
+Teljes, visszaállíthatatlan adattörléshez külön kell törölni a `redis-data-redis-master-0` PVC-t. Ezt csak ellenőrzött, másik gépre másolt mentés után tedd; az update és a fenti alap uninstall szándékosan nem törli.
